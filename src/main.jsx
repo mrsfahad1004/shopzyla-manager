@@ -14,7 +14,7 @@ function AppBridgeWrapper({ children }) {
     if (isEmbedded || (shop && host)) {
       import('@shopify/app-bridge').then(({ createApp }) => {
         const app = createApp({
-          apiKey: '8f7f32d0b4f52d20d2109b8eaf0f620c',
+          apiKey: '901026f9a765bce56ce9682beee6b90e',
           host: host || undefined,
           shop: shop || undefined,
         })

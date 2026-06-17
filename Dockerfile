@@ -2,11 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies
-COPY package.json package-lock.json ./
-RUN npm install --only=production 2>/dev/null || npm install
+# Install build tools for native modules
+RUN apk add --no-cache wget
 
-# Copy built files and server
+# Copy package files and install dependencies (including express)
+COPY package.json package-lock.json ./
+RUN npm install 2>/dev/null || npm install --only=production 2>/dev/null || true
+
+# Copy build output and server
 COPY dist/ ./dist/
 COPY server.cjs ./
 

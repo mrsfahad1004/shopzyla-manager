@@ -3,34 +3,24 @@ const path = require('path');
 const https = require('https');
 const fs = require('fs');
 
-// Load env
-const envPath = path.join(__dirname, '..', '..', '.env');
-if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, 'utf8');
-  envContent.split('\n').forEach(line => {
-    const [key, ...val] = line.split('=');
-    if (key && val.length) process.env[key.trim()] = val.join('=').trim();
-  });
-}
-
 const PORT = process.env.PORT || 3000;
 const DIST = path.join(__dirname, 'dist');
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE || 'gmxdth-9b';
 const SHOPIFY_STORE_URL = process.env.SHOPIFY_STORE_URL || `https://${SHOPIFY_STORE}.myshopify.com`;
 const ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
-const API_KEY = process.env.SHOPIFY_API_KEY || '8f7f32d0b4f52d20d2109b8eaf0f620c';
+const API_KEY = process.env.SHOPIFY_API_KEY || '901026f9a765bce56ce9682beee6b90e';
 const API_VERSION = '2024-10';
+const APP_URL = process.env.APP_URL || 'https://shopzyla-manager-production.up.railway.app';
 
 const app = express();
 app.set('trust proxy', 1);
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// CORS + CSP for embedded Shopify Admin
+// CSP + CORS for embedded Shopify Admin
 app.use((req, res, next) => {
-  // Allow Shopify to embed this app in an iframe
-  res.setHeader('Content-Security-Policy', 
-    "frame-ancestors https://*.myshopify.com https://admin.shopify.com https://*.shopify.com https://*.spin.dev 'self';"
+  res.setHeader('Content-Security-Policy',
+    `frame-ancestors https://*.myshopify.com https://admin.shopify.com https://*.shopify.com 'self';`
   );
   res.setHeader('X-Frame-Options', 'ALLOWALL');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -40,19 +30,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// ============================================
-// SHOPIFY API PROXY
-// ============================================
+// ── Shopify API Proxy ──
 function shopifyRequest(method, endpoint, body) {
   return new Promise((resolve, reject) => {
-    const apiUrl = endpoint.startsWith('http')
-      ? new URL(endpoint)
-      : new URL(`https://${SHOPIFY_STORE}.myshopify.com/admin/api/${API_VERSION}${endpoint}`);
-    
+    const store = SHOPIFY_STORE.includes('.') ? SHOPIFY_STORE : `${SHOPIFY_STORE}.myshopify.com`;
     const options = {
-      hostname: apiUrl.hostname,
-      path: apiUrl.pathname + apiUrl.search,
-      method: method,
+      hostname: store,
+      path: `/admin/api/${API_VERSION}${endpoint}`,
+      method,
       headers: {
         'X-Shopify-Access-Token': ACCESS_TOKEN,
         'Content-Type': 'application/json',
@@ -60,47 +45,36 @@ function shopifyRequest(method, endpoint, body) {
       },
       rejectUnauthorized: false,
     };
-
-    const r = https.request(options, (res) => {
+    const req = https.request(options, (res) => {
       let data = '';
       res.on('data', c => data += c);
       res.on('end', () => {
-        try {
-          resolve({ status: res.statusCode, data: data ? JSON.parse(data) : null });
-        } catch (e) {
-          resolve({ status: res.statusCode, data: data });
-        }
+        try { resolve({ status: res.statusCode, data: data ? JSON.parse(data) : null }); }
+        catch (e) { resolve({ status: res.statusCode, data }); }
       });
     });
-    r.on('error', reject);
-    r.setTimeout(30000, () => { r.destroy(); reject(new Error('Timeout')); });
-    if (body) r.write(JSON.stringify(body));
-    r.end();
+    req.on('error', reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error('Timeout')); });
+    if (body) req.write(JSON.stringify(body));
+    req.end();
   });
 }
 
-// Shopify REST API proxy
+// REST API proxy
 app.use('/api/shopify', async (req, res) => {
   try {
-    const endpoint = req.url.startsWith('/') ? req.url : '/' + req.url;
-    console.log(`  ⚡ API: ${req.method} ${endpoint}`);
-    const result = await shopifyRequest(req.method, endpoint, req.body);
+    const ep = req.url.startsWith('/') ? req.url : '/' + req.url;
+    const result = await shopifyRequest(req.method, ep, req.body);
     res.status(result.status).json(result.data || {});
-  } catch (err) {
-    console.error('  ❌ API Error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Shopify GraphQL proxy
+// GraphQL proxy
 app.post('/api/graphql', async (req, res) => {
   try {
     const result = await shopifyRequest('POST', '/graphql.json', req.body);
     res.status(result.status).json(result.data || {});
-  } catch (err) {
-    console.error('  ❌ GraphQL Error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Store status
@@ -114,82 +88,65 @@ app.get('/api/store', async (req, res) => {
       connected: !!ACCESS_TOKEN,
       store: SHOPIFY_STORE_URL,
       apiKey: API_KEY,
-      shopInfo: shopInfo.data?.shop || null,
+      appUrl: APP_URL,
       productCount: productCount.data?.count || 0,
       collectionCount: collectionsCount.data?.count || 0,
-      orderCount: ordersCount.data?.count || 0,
+      orderCount: ordersCount.data?.count || 0
     });
   } catch (err) {
     res.json({ connected: false, store: SHOPIFY_STORE_URL, error: err.message });
   }
 });
 
-// ============================================
-// STATIC FILES (with SPA fallback)
-// ============================================
-const staticDir = path.resolve(DIST);
+// ── Custom App Install Handler ──
+// Shopify Custom Apps do NOT need OAuth. Just serve the app.
+app.get('/auth/install', (req, res) => {
+  const shop = req.query.shop || SHOPIFY_STORE;
+  res.redirect(`/?shop=${shop}`);
+});
 
+// ── Static files with SPA fallback ──
 function injectConfig(html) {
-  // Remove crossorigin from script tags (for local dev)
-  const cleaned = html.replace(/<script([^>]*) crossorigin/g, '<script$1');
-  // Inject Shopify config
-  return cleaned.replace('</title>', `</title><script>window.__SHOPIFY_CONFIG__=${JSON.stringify({
+  const config = JSON.stringify({
     apiKey: API_KEY,
     storeUrl: SHOPIFY_STORE_URL,
     storeName: SHOPIFY_STORE,
     connected: !!ACCESS_TOKEN,
-  })}</script>`);
+  });
+  return html.replace('</title>', `</title><script>window.__SHOPIFY_CONFIG__=${config}</script>`);
 }
 
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
-  
-  const filePath = req.path === '/' ? path.join(staticDir, 'index.html') : path.join(staticDir, req.path);
-  
+
+  const filePath = path.join(DIST, req.path === '/' ? 'index.html' : req.path);
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-    const ext = path.extname(filePath);
-    if (ext === '.html') {
-      const html = fs.readFileSync(filePath, 'utf8');
-      res.setHeader('Content-Type', 'text/html');
-      return res.send(injectConfig(html));
+    if (path.extname(filePath) === '.html') {
+      return res.send(injectConfig(fs.readFileSync(filePath, 'utf8')));
     }
     return next();
   }
-  
+
   // SPA fallback
-  const indexPath = path.join(staticDir, 'index.html');
+  const indexPath = path.join(DIST, 'index.html');
   if (fs.existsSync(indexPath)) {
-    const html = fs.readFileSync(indexPath, 'utf8');
-    res.setHeader('Content-Type', 'text/html');
-    return res.send(injectConfig(html));
+    return res.send(injectConfig(fs.readFileSync(indexPath, 'utf8')));
   }
-  
   next();
 });
 
-// Serve static assets
 app.use(express.static(DIST));
+app.use('/api/', (req, res) => res.status(404).json({ error: 'API endpoint not found' }));
 
-// 404 for unknown API routes
-app.use('/api/', (req, res) => {
-  res.status(404).json({ error: 'API endpoint not found' });
-});
-
-// ============================================
-// START
-// ============================================
+// ── Start ──
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('');
-  console.log('\x1b[38;5;208m  ╔═══════════════════════════════════╗\x1b[0m');
-  console.log('\x1b[38;5;208m  ║      🚀 ShopZyla Manager App      ║\x1b[0m');
-  console.log('\x1b[38;5;208m  ╚═══════════════════════════════════╝\x1b[0m');
-  console.log('');
-  console.log('  \x1b[90m➜\x1b[0m  \x1b[1mURL:\x1b[0m        \x1b[36mhttp://localhost:' + PORT + '/\x1b[0m');
-  console.log('  \x1b[90m➜\x1b[0m  \x1b[1mAPI:\x1b[0m         \x1b[36mhttp://localhost:' + PORT + '/api/store\x1b[0m');
-  console.log('  \x1b[90m➜\x1b[0m  \x1b[1mDashboard:\x1b[0m   \x1b[36mhttp://localhost:' + PORT + '/\x1b[0m');
-  console.log('');
-  console.log('  \x1b[90m📦\x1b[0m  \x1b[1mStore:\x1b[0m       ' + SHOPIFY_STORE_URL);
-  console.log('  \x1b[90m🔑\x1b[0m  \x1b[1mAPI:\x1b[0m         ' + (ACCESS_TOKEN ? '\x1b[32mConnected ✓\x1b[0m' : '\x1b[31mNo Token ✗\x1b[0m'));
-  console.log('  \x1b[90m🔗\x1b[0m  \x1b[1mApp Bridge:\x1b[0m   \x1b[36mEnabled for embedded Shopify Admin\x1b[0m');
-  console.log('');
+  console.log(`  🚀 ShopZyla Manager v1.0`);
+  console.log(`  📍 http://localhost:${PORT}/`);
+  console.log(`  📦 ${SHOPIFY_STORE_URL}`);
+  console.log(`  🔑 ${ACCESS_TOKEN ? 'Connected ✓' : 'No Token ✗'}`);
+  if (ACCESS_TOKEN) {
+    shopifyRequest('GET', '/shop.json').then(r => {
+      console.log(`  🏪 ${r.data?.shop?.name || 'ShopZyla'} — connected`);
+    }).catch(() => {});
+  }
 });
