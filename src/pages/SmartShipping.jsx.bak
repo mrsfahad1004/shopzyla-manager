@@ -1,0 +1,429 @@
+import { useState, useEffect } from 'react'
+import { Globe, MapPin, Truck, DollarSign, TrendingDown, Shield, Zap, CheckCircle, AlertTriangle, Search, Settings, ArrowRight, Package, Sparkles, RefreshCw, Sliders } from 'lucide-react'
+import { theme } from '../theme'
+
+// Countries organized by region with shipping cost data
+const countriesByRegion = {
+  'South Asia': [
+    { code: 'PK', name: 'Pakistan', flag: '🇵🇰', shippingCost: [2, 5], freeThreshold: 25, localFulfillment: true, localProviders: ['TCS', 'Leopards', 'BlueEx'] },
+    { code: 'IN', name: 'India', flag: '🇮🇳', shippingCost: [5, 12], freeThreshold: 40, localFulfillment: false, localProviders: ['DTDC', 'India Post'] },
+    { code: 'BD', name: 'Bangladesh', flag: '🇧🇩', shippingCost: [6, 14], freeThreshold: 45, localFulfillment: false, localProviders: [] },
+    { code: 'LK', name: 'Sri Lanka', flag: '🇱🇰', shippingCost: [7, 15], freeThreshold: 50, localFulfillment: false, localProviders: [] },
+    { code: 'NP', name: 'Nepal', flag: '🇳🇵', shippingCost: [8, 16], freeThreshold: 50, localFulfillment: false, localProviders: [] },
+  ],
+  'Middle East': [
+    { code: 'AE', name: 'UAE', flag: '🇦🇪', shippingCost: [5, 10], freeThreshold: 35, localFulfillment: false, localProviders: ['Emirates Post', 'Aramex'] },
+    { code: 'SA', name: 'Saudi Arabia', flag: '🇸🇦', shippingCost: [6, 12], freeThreshold: 40, localFulfillment: false, localProviders: ['Saudi Post'] },
+    { code: 'QA', name: 'Qatar', flag: '🇶🇦', shippingCost: [8, 14], freeThreshold: 45, localFulfillment: false, localProviders: [] },
+    { code: 'KW', name: 'Kuwait', flag: '🇰🇼', shippingCost: [7, 13], freeThreshold: 40, localFulfillment: false, localProviders: [] },
+    { code: 'BH', name: 'Bahrain', flag: '🇧🇭', shippingCost: [8, 14], freeThreshold: 45, localFulfillment: false, localProviders: [] },
+    { code: 'OM', name: 'Oman', flag: '🇴🇲', shippingCost: [8, 15], freeThreshold: 45, localFulfillment: false, localProviders: [] },
+    { code: 'TR', name: 'Turkey', flag: '🇹🇷', shippingCost: [7, 14], freeThreshold: 40, localFulfillment: false, localProviders: ['PTT'] },
+  ],
+  'North America': [
+    { code: 'US', name: 'United States', flag: '🇺🇸', shippingCost: [4, 8], freeThreshold: 35, localFulfillment: true, localProviders: ['USPS', 'FedEx', 'UPS', 'DHL'] },
+    { code: 'CA', name: 'Canada', flag: '🇨🇦', shippingCost: [5, 10], freeThreshold: 40, localFulfillment: true, localProviders: ['Canada Post', 'FedEx', 'UPS'] },
+    { code: 'MX', name: 'Mexico', flag: '🇲🇽', shippingCost: [8, 16], freeThreshold: 50, localFulfillment: false, localProviders: ['Correos de Mexico'] },
+  ],
+  'Europe': [
+    { code: 'GB', name: 'United Kingdom', flag: '🇬🇧', shippingCost: [4, 8], freeThreshold: 30, localFulfillment: true, localProviders: ['Royal Mail', 'DHL', 'FedEx'] },
+    { code: 'DE', name: 'Germany', flag: '🇩🇪', shippingCost: [4, 9], freeThreshold: 30, localFulfillment: true, localProviders: ['Deutsche Post', 'DHL'] },
+    { code: 'FR', name: 'France', flag: '🇫🇷', shippingCost: [4, 9], freeThreshold: 35, localFulfillment: false, localProviders: ['La Poste'] },
+    { code: 'IT', name: 'Italy', flag: '🇮🇹', shippingCost: [5, 10], freeThreshold: 35, localFulfillment: false, localProviders: ['Poste Italiane'] },
+    { code: 'ES', name: 'Spain', flag: '🇪🇸', shippingCost: [5, 10], freeThreshold: 35, localFulfillment: false, localProviders: ['Correos'] },
+    { code: 'NL', name: 'Netherlands', flag: '🇳🇱', shippingCost: [4, 9], freeThreshold: 30, localFulfillment: false, localProviders: ['PostNL'] },
+    { code: 'SE', name: 'Sweden', flag: '🇸🇪', shippingCost: [5, 10], freeThreshold: 35, localFulfillment: false, localProviders: ['PostNord'] },
+    { code: 'NO', name: 'Norway', flag: '🇳🇴', shippingCost: [6, 12], freeThreshold: 40, localFulfillment: false, localProviders: ['Posten'] },
+    { code: 'CH', name: 'Switzerland', flag: '🇨🇭', shippingCost: [5, 11], freeThreshold: 40, localFulfillment: false, localProviders: ['Swiss Post'] },
+    { code: 'PL', name: 'Poland', flag: '🇵🇱', shippingCost: [6, 12], freeThreshold: 40, localFulfillment: false, localProviders: ['Poczta Polska'] },
+  ],
+  'East Asia & Pacific': [
+    { code: 'JP', name: 'Japan', flag: '🇯🇵', shippingCost: [5, 10], freeThreshold: 35, localFulfillment: true, localProviders: ['Japan Post', 'Yamato'] },
+    { code: 'KR', name: 'South Korea', flag: '🇰🇷', shippingCost: [5, 10], freeThreshold: 35, localFulfillment: false, localProviders: ['Korea Post'] },
+    { code: 'AU', name: 'Australia', flag: '🇦🇺', shippingCost: [6, 12], freeThreshold: 40, localFulfillment: true, localProviders: ['Australia Post', 'FedEx'] },
+    { code: 'NZ', name: 'New Zealand', flag: '🇳🇿', shippingCost: [7, 14], freeThreshold: 45, localFulfillment: false, localProviders: ['NZ Post'] },
+    { code: 'SG', name: 'Singapore', flag: '🇸🇬', shippingCost: [4, 9], freeThreshold: 30, localFulfillment: false, localProviders: ['SingPost'] },
+    { code: 'MY', name: 'Malaysia', flag: '🇲🇾', shippingCost: [5, 11], freeThreshold: 35, localFulfillment: false, localProviders: ['Pos Malaysia'] },
+    { code: 'TH', name: 'Thailand', flag: '🇹🇭', shippingCost: [5, 11], freeThreshold: 35, localFulfillment: false, localProviders: ['Thailand Post'] },
+    { code: 'VN', name: 'Vietnam', flag: '🇻🇳', shippingCost: [6, 13], freeThreshold: 40, localFulfillment: false, localProviders: ['VN Post'] },
+    { code: 'ID', name: 'Indonesia', flag: '🇮🇩', shippingCost: [7, 14], freeThreshold: 45, localFulfillment: false, localProviders: ['Pos Indonesia'] },
+    { code: 'PH', name: 'Philippines', flag: '🇵🇭', shippingCost: [7, 15], freeThreshold: 45, localFulfillment: false, localProviders: ['PHLPost'] },
+  ],
+  'Africa': [
+    { code: 'ZA', name: 'South Africa', flag: '🇿🇦', shippingCost: [10, 20], freeThreshold: 60, localFulfillment: false, localProviders: ['SAPO'] },
+    { code: 'NG', name: 'Nigeria', flag: '🇳🇬', shippingCost: [12, 25], freeThreshold: 70, localFulfillment: false, localProviders: ['NIPOST'] },
+    { code: 'KE', name: 'Kenya', flag: '🇰🇪', shippingCost: [10, 22], freeThreshold: 65, localFulfillment: false, localProviders: ['Posta Kenya'] },
+    { code: 'EG', name: 'Egypt', flag: '🇪🇬', shippingCost: [8, 18], freeThreshold: 55, localFulfillment: false, localProviders: ['Egypt Post'] },
+    { code: 'MA', name: 'Morocco', flag: '🇲🇦', shippingCost: [8, 17], freeThreshold: 55, localFulfillment: false, localProviders: ['Poste Maroc'] },
+    { code: 'DZ', name: 'Algeria', flag: '🇩🇿', shippingCost: [9, 19], freeThreshold: 60, localFulfillment: false, localProviders: ['Algerie Poste'] },
+  ],
+  'South America': [
+    { code: 'BR', name: 'Brazil', flag: '🇧🇷', shippingCost: [12, 25], freeThreshold: 70, localFulfillment: false, localProviders: ['Correios'] },
+    { code: 'AR', name: 'Argentina', flag: '🇦🇷', shippingCost: [10, 22], freeThreshold: 65, localFulfillment: false, localProviders: ['Correo Argentino'] },
+    { code: 'CO', name: 'Colombia', flag: '🇨🇴', shippingCost: [8, 18], freeThreshold: 55, localFulfillment: false, localProviders: ['4-72'] },
+    { code: 'CL', name: 'Chile', flag: '🇨🇱', shippingCost: [8, 17], freeThreshold: 55, localFulfillment: false, localProviders: ['Correos Chile'] },
+    { code: 'PE', name: 'Peru', flag: '🇵🇪', shippingCost: [9, 19], freeThreshold: 60, localFulfillment: false, localProviders: ['Serpost'] },
+  ],
+}
+
+function CountryCard({ country, onThresholdChange }) {
+  const avgShipping = (country.shippingCost[0] + country.shippingCost[1]) / 2
+  const shippingLevel = avgShipping > 12 ? 'high' : avgShipping > 7 ? 'medium' : 'low'
+  const levelColors = { high: theme.colors.error, medium: theme.colors.warning, low: theme.colors.success }
+  const levelLabels = { high: 'Expensive', medium: 'Moderate', low: 'Cheap' }
+
+  return (
+    <div style={{
+      background: theme.colors.bgCard,
+      border: `1px solid ${theme.colors.border}`,
+      borderRadius: '14px',
+      overflow: 'hidden',
+      transition: 'all 0.3s',
+    }}
+    onMouseEnter={e => e.currentTarget.style.borderColor = levelColors[shippingLevel]}
+    onMouseLeave={e => e.currentTarget.style.borderColor = theme.colors.border}
+    >
+      <div style={{ padding: '16px 18px' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: '24px' }}>{country.flag}</span>
+            <div>
+              <div style={{ fontFamily: theme.fonts.heading, fontSize: '14px', fontWeight: 500, color: theme.colors.textBright }}>
+                {country.name}
+              </div>
+              <div style={{ fontSize: '10px', color: theme.colors.textMuted }}>{country.code}</div>
+            </div>
+          </div>
+          <div style={{
+            padding: '3px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 700,
+            background: `${levelColors[shippingLevel]}15`, color: levelColors[shippingLevel],
+            border: `1px solid ${levelColors[shippingLevel]}25`,
+          }}>
+            {levelLabels[shippingLevel]}
+          </div>
+        </div>
+
+        {/* Shipping Cost Bar */}
+        <div style={{
+          padding: '10px 12px',
+          background: theme.colors.bg,
+          borderRadius: '8px',
+          marginBottom: 10,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: theme.colors.textMuted, marginBottom: 4 }}>
+            <span>Shipping Cost</span>
+            <span>${country.shippingCost[0]} — ${country.shippingCost[1]}</span>
+          </div>
+          <div style={{ height: 4, background: theme.colors.border, borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{
+              width: `${(avgShipping / 25) * 100}%`,
+              height: '100%',
+              background: `linear-gradient(90deg, ${theme.colors.success}, ${theme.colors.warning}, ${theme.colors.error})`,
+              borderRadius: 2,
+            }} />
+          </div>
+        </div>
+
+        {/* Free Shipping Threshold */}
+        <div style={{
+          padding: '8px 10px',
+          background: `${theme.colors.primary}08`,
+          borderRadius: '8px',
+          border: `1px solid ${theme.colors.primary}15`,
+          marginBottom: 10,
+        }}>
+          <div style={{ fontSize: '9px', color: theme.colors.textMuted, marginBottom: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            Free Shipping Threshold
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="range"
+              min={10}
+              max={100}
+              step={5}
+              value={country.freeThreshold}
+              onChange={e => onThresholdChange(country.code, parseInt(e.target.value))}
+              style={{ flex: 1, accentColor: theme.colors.primary, height: 6 }}
+            />
+            <span style={{
+              fontFamily: theme.fonts.heading, fontSize: '18px', fontWeight: 700,
+              color: theme.colors.primary, minWidth: 45, textAlign: 'right',
+            }}>
+              ${country.freeThreshold}
+            </span>
+          </div>
+          <div style={{ fontSize: '9px', color: theme.colors.textMuted, marginTop: 4 }}>
+            Orders above ${country.freeThreshold} get FREE shipping
+          </div>
+        </div>
+
+        {/* Local Fulfillment */}
+        {country.localFulfillment && (
+          <div style={{
+            padding: '6px 10px',
+            background: `${theme.colors.success}08`,
+            borderRadius: '6px',
+            border: `1px solid ${theme.colors.success}15`,
+            fontSize: '10px',
+            color: theme.colors.success,
+            marginBottom: 8,
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <CheckCircle size={12} />
+            Local fulfillment available — {country.localProviders.slice(0, 2).join(', ')}
+          </div>
+        )}
+
+        {!country.localFulfillment && (
+          <div style={{
+            padding: '6px 10px',
+            background: `${theme.colors.warning}08`,
+            borderRadius: '6px',
+            border: `1px solid ${theme.colors.warning}15`,
+            fontSize: '10px',
+            color: theme.colors.warning,
+            marginBottom: 8,
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <AlertTriangle size={12} />
+            Ships from China — {avgShipping > 12 ? 'consider regional fulfillment' : 'manageable cost'}
+          </div>
+        )}
+
+        {/* Strategy Recommendation */}
+        <div style={{
+          padding: '8px 10px',
+          background: theme.colors.bg,
+          borderRadius: '6px',
+          fontSize: '10px',
+          color: theme.colors.text,
+          lineHeight: 1.5,
+        }}>
+          {shippingLevel === 'high' ? (
+            <>💡 <strong>Strategy:</strong> Use subsidized shipping (customer pays $8-12). Free threshold at ${country.freeThreshold}+. Consider local fulfillment.</>
+          ) : shippingLevel === 'medium' ? (
+            <>💡 <strong>Strategy:</strong> Free shipping above ${country.freeThreshold}. Standard shipping $3-7 below threshold.</>
+          ) : (
+            <>💡 <strong>Strategy:</strong> Free shipping above ${country.freeThreshold}. Customer pays $2-4 below threshold. Low cost — competitive advantage!</>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function SmartShipping() {
+  const [search, setSearch] = useState('')
+  const [selectedRegion, setSelectedRegion] = useState('all')
+  const [thresholds, setThresholds] = useState({})
+  const [storeInfo, setStoreInfo] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/store').then(r => r.json()).then(d => setStoreInfo(d)).catch(() => {})
+  }, [])
+
+  const handleThresholdChange = (countryCode, value) => {
+    setThresholds(prev => ({ ...prev, [countryCode]: value }))
+  }
+
+  // Flatten all countries
+  const allCountries = Object.entries(countriesByRegion).flatMap(([region, countries]) =>
+    countries.map(c => ({ ...c, region }))
+  )
+
+  // Apply threshold overrides
+  const countriesWithThresholds = allCountries.map(c => ({
+    ...c,
+    freeThreshold: thresholds[c.code] !== undefined ? thresholds[c.code] : c.freeThreshold,
+  }))
+
+  // Filter
+  const filtered = countriesWithThresholds.filter(c => {
+    if (selectedRegion !== 'all' && c.region !== selectedRegion) return false
+    if (search && !c.name.toLowerCase().includes(search.toLowerCase()) && !c.code.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
+
+  // Group by shipping cost level
+  const cheapCountries = filtered.filter(c => (c.shippingCost[0] + c.shippingCost[1]) / 2 <= 5)
+  const moderateCountries = filtered.filter(c => {
+    const avg = (c.shippingCost[0] + c.shippingCost[1]) / 2
+    return avg > 5 && avg <= 10
+  })
+  const expensiveCountries = filtered.filter(c => (c.shippingCost[0] + c.shippingCost[1]) / 2 > 10)
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{
+          fontFamily: theme.fonts.heading, fontSize: '32px', fontWeight: 600,
+          color: theme.colors.textBright, letterSpacing: '0.02em',
+          textTransform: 'uppercase', marginBottom: 4,
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          🌍 Smart Shipping Rules
+          <span style={{
+            fontSize: '10px', fontWeight: 400, color: theme.colors.primary,
+            background: `${theme.colors.primary}10`, padding: '2px 10px', borderRadius: '8px',
+            border: `1px solid ${theme.colors.primary}20`,
+          }}>
+            Auto-Detect Region
+          </span>
+        </div>
+        <div style={{ width: '60px', height: '4px', background: `linear-gradient(90deg, ${theme.colors.primary}, ${theme.colors.primaryLight})`, borderRadius: '2px', marginBottom: 8, boxShadow: theme.shadows.glow }} />
+        <div style={{ fontSize: '13px', color: theme.colors.textMuted }}>
+          Per-country free shipping thresholds + auto-detect customer region + local fulfillment recommendations
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+        gap: '12px', marginBottom: 20,
+      }}>
+        {[
+          { label: 'Countries', value: Object.values(countriesByRegion).flat().length, icon: Globe, color: theme.colors.primary },
+          { label: 'Regions', value: Object.keys(countriesByRegion).length, icon: MapPin, color: theme.colors.success },
+          { label: 'Local Fulfillment', value: Object.values(countriesByRegion).flat().filter(c => c.localFulfillment).length, icon: Truck, color: theme.colors.primaryLight },
+          { label: 'Expensive Dest', value: Object.values(countriesByRegion).flat().filter(c => (c.shippingCost[0] + c.shippingCost[1]) / 2 > 10).length, icon: TrendingDown, color: theme.colors.error },
+        ].map((s, i) => (
+          <div key={i} style={{ background: theme.colors.bgCard, border: `1px solid ${theme.colors.border}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '8px', background: `${s.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <s.icon size={14} color={s.color} />
+            </div>
+            <div>
+              <div style={{ fontSize: '9px', color: theme.colors.textMuted, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{s.label}</div>
+              <div style={{ fontFamily: theme.fonts.heading, fontSize: '16px', fontWeight: 600, color: theme.colors.textBright }}>{s.value}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Controls */}
+      <div style={{
+        background: theme.colors.bgCard, border: `1px solid ${theme.colors.border}`,
+        borderRadius: '14px', padding: '16px 20px', marginBottom: 20,
+      }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Search */}
+          <div style={{ flex: 1, minWidth: 180, position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: theme.colors.textMuted }} />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search country..."
+              style={{ width: '100%', padding: '8px 12px 8px 36px', background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, borderRadius: '8px', color: theme.colors.textBright, fontSize: '12px', fontFamily: theme.fonts.body, outline: 'none' }}
+            />
+          </div>
+
+          {/* Region Filter */}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {['all', ...Object.keys(countriesByRegion)].map(region => (
+              <button key={region} onClick={() => setSelectedRegion(region)} style={{
+                padding: '5px 12px', borderRadius: '6px', border: `1px solid ${selectedRegion === region ? theme.colors.primary : theme.colors.border}`,
+                background: selectedRegion === region ? `${theme.colors.primary}15` : 'transparent',
+                color: selectedRegion === region ? theme.colors.primary : theme.colors.textMuted,
+                fontSize: '9px', fontWeight: 600, cursor: 'pointer', fontFamily: theme.fonts.body,
+                textTransform: 'capitalize', whiteSpace: 'nowrap',
+              }}>
+                {region === 'all' ? 'All' : region}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Results by Cost Level */}
+      {cheapCountries.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{
+            fontFamily: theme.fonts.heading, fontSize: '14px', fontWeight: 500,
+            color: theme.colors.success, marginBottom: 10,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            ✅ Cheap Shipping Destinations ({cheapCountries.length})
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+            {cheapCountries.map(c => (
+              <CountryCard key={c.code} country={c} onThresholdChange={handleThresholdChange} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {moderateCountries.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{
+            fontFamily: theme.fonts.heading, fontSize: '14px', fontWeight: 500,
+            color: theme.colors.warning, marginBottom: 10,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            ⚠️ Moderate Shipping Destinations ({moderateCountries.length})
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+            {moderateCountries.map(c => (
+              <CountryCard key={c.code} country={c} onThresholdChange={handleThresholdChange} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {expensiveCountries.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{
+            fontFamily: theme.fonts.heading, fontSize: '14px', fontWeight: 500,
+            color: theme.colors.error, marginBottom: 10,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            🔴 Expensive Shipping Destinations ({expensiveCountries.length})
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+            {expensiveCountries.map(c => (
+              <CountryCard key={c.code} country={c} onThresholdChange={handleThresholdChange} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Strategy Guide */}
+      <div style={{
+        background: `linear-gradient(135deg, ${theme.colors.bgCard}, ${theme.colors.bgLight})`,
+        border: `1px solid ${theme.colors.border}`,
+        borderRadius: '16px', padding: '24px',
+      }}>
+        <div style={{ fontFamily: theme.fonts.heading, fontSize: '15px', fontWeight: 500, color: theme.colors.textBright, marginBottom: 14 }}>
+          🧠 Auto Region Detection — How It Works
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+          {[
+            { step: '1', title: 'Customer Checks Out', desc: 'Shopify auto-detects customer shipping address country', icon: MapPin },
+            { step: '2', title: 'Region Matched', desc: 'Country matched to region — shipping cost + free threshold loaded', icon: Globe },
+            { step: '3', title: 'Local or China?', desc: 'If local fulfillment available → ship from local warehouse. If not → ship from China', icon: Truck },
+            { step: '4', title: 'Threshold Applied', desc: 'Free shipping threshold shown based on region. Expensive regions see higher threshold', icon: Sliders },
+            { step: '5', title: 'Cheapest Provider', desc: 'Auto-select cheapest logistics provider for that destination', icon: TrendingDown },
+            { step: '6', title: 'Checkout Complete', desc: 'Customer sees optimized shipping options with correct pricing', icon: Zap },
+          ].map((s, i) => (
+            <div key={i} style={{
+              padding: '14px 16px', background: theme.colors.bg, borderRadius: '10px',
+              border: `1px solid ${theme.colors.border}`,
+            }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%',
+                background: theme.colors.primary, color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '12px', fontWeight: 700, marginBottom: 8,
+              }}>{s.step}</div>
+              <div style={{ fontFamily: theme.fonts.heading, fontSize: '13px', fontWeight: 500, color: theme.colors.textBright, marginBottom: 4 }}>
+                {s.title}
+              </div>
+              <div style={{ fontSize: '10px', color: theme.colors.textMuted, lineHeight: 1.5 }}>
+                {s.desc}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
